@@ -1,5 +1,6 @@
 import styled from '@emotion/styled';
 import React, { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { useGetProductDetail } from '@/api/hooks/useGetProductDetail';
@@ -7,32 +8,39 @@ import { Spinner } from '@/components/common/Spinner';
 import { ProductDetailContent } from '@/components/features/ProductDetail/ProductDetail/ProductDetailContent';
 import { useAuth } from '@/provider/Auth';
 
+type FormData = {
+  productId: string;
+  name: string;
+  imageUrl: string;
+  price: number;
+};
+
 const ProductDetail: React.FC = () => {
   const { productId } = useParams<{ productId: string }>();
   const { data, isLoading, isError } = useGetProductDetail(productId || '');
   const navigate = useNavigate();
   const isAuthenticated = useAuth();
+  const { handleSubmit, setValue } = useForm<FormData>();
 
   useEffect(() => {
     if (!isLoading && !data) {
       navigate('/');
     }
-  }, [productId, data, isLoading, navigate]);
+    if (data) {
+      setValue('productId', productId || '');
+      setValue('name', data.detail.name);
+      setValue('imageUrl', data.detail.imageURL);
+      setValue('price', data.detail.price?.sellingPrice || 0);
+    }
+  }, [productId, data, isLoading, navigate, setValue]);
 
-  const handleGiftButtonClick = () => {
+  const onSubmit = (formData: FormData) => {
     if (!isAuthenticated) {
       alert('로그인이 필요합니다.\n로그인 페이지로 이동하시겠습니까?');
       navigate('/login');
     } else if (data) {
       navigate('/order', {
-        state: {
-          product: {
-            id: productId || '',
-            name: data.detail.name,
-            imageUrl: data.detail.imageURL,
-            price: data.detail.price?.sellingPrice || 0,
-          },
-        },
+        state: { product: formData },
       });
     }
   };
@@ -46,17 +54,15 @@ const ProductDetail: React.FC = () => {
   if (isError) return <TextView>상품을 불러오는 도중에 에러가 발생했습니다.</TextView>;
   if (!data) return <TextView>상품이 없습니다.</TextView>;
 
-  const product = data.detail;
-  const imageUrl = product.imageURL;
-  const sellingPrice = product.price?.sellingPrice;
-
   return (
-    <ProductDetailContent
-      imageUrl={imageUrl}
-      name={product.name}
-      price={sellingPrice}
-      onButtonClick={handleGiftButtonClick}
-    />
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <ProductDetailContent
+        imageUrl={data.detail.imageURL}
+        name={data.detail.name}
+        price={data.detail.price?.sellingPrice}
+        onButtonClick={handleSubmit(onSubmit)}
+      />
+    </form>
   );
 };
 
